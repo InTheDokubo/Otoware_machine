@@ -3,261 +3,147 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>超音割れビデオメーカー - Extreme Earrape Maker</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <title>超音割れビデオメーカー</title>
     <style>
-        body { background-color: #0a0a0a; color: #ffffff; overflow-x: hidden; }
-        .glitch-text { text-shadow: 2px 0 #ff0000, -2px 0 #00ff00; }
-        .extreme-shake { animation: shake 0.1s infinite; }
-        @keyframes shake {
-            0% { transform: translate(1px, 1px); }
-            50% { transform: translate(-1px, -1px); }
-            100% { transform: translate(1px, -1px); }
-        }
-        input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 20px; height: 20px; background: #ef4444; border-radius: 50%; cursor: pointer; }
+        body { font-family: sans-serif; background: #1a1a1a; color: white; display: flex; flex-direction: column; align-items: center; padding: 20px; }
+        .container { max-width: 600px; width: 100%; background: #2a2a2a; padding: 20px; border-radius: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.5); text-align: center; }
+        video { width: 100%; margin-top: 20px; border-radius: 5px; background: #000; }
+        .controls { margin-top: 20px; display: flex; flex-direction: column; gap: 15px; }
+        button { padding: 10px 20px; cursor: pointer; border: none; border-radius: 5px; background: #ff4757; color: white; font-weight: bold; transition: 0.3s; }
+        button:disabled { background: #555; cursor: not-allowed; }
+        button:hover:not(:disabled) { background: #ff6b81; }
+        input[type="range"] { width: 100%; }
+        .status { margin-top: 10px; font-size: 0.9em; color: #ffa502; }
     </style>
 </head>
-<body class="flex flex-col items-center p-4 md:p-10 font-sans">
+<body>
 
-    <div class="w-full max-w-3xl">
-        <header class="text-center mb-10">
-            <h1 id="main-title" class="text-5xl md:text-7xl font-black italic text-red-600 uppercase tracking-tighter mb-2">Extreme Loudness</h1>
-            <p class="text-gray-400 font-bold uppercase tracking-widest text-sm">Digital Ear-Destroyer Engine</p>
-        </header>
+<div class="container">
+    <h1>🔊 超音割れメーカー</h1>
+    <p>動画を読み込んで、音を破壊します。</p>
 
-        <div class="bg-zinc-900 rounded-3xl p-6 shadow-2xl border border-zinc-800">
-            <!-- Upload Section -->
-            <div id="drop-zone" class="border-4 border-dashed border-zinc-700 rounded-2xl p-12 flex flex-col items-center justify-center hover:border-red-600 transition-colors cursor-pointer group">
-                <div class="w-16 h-16 bg-red-600 rounded-full flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                    </svg>
-                </div>
-                <p class="text-xl font-black text-white">動画ファイルをアップロード</p>
-                <p class="text-zinc-500 mt-2 text-sm uppercase">Click or Drag & Drop</p>
-                <input type="file" id="video-input" accept="video/*" class="hidden">
-            </div>
+    <input type="file" id="upload" accept="video/*">
+    
+    <div class="controls">
+        <label>音割れ強度 (Distortion): <span id="distVal">50</span></label>
+        <input type="range" id="distRange" min="1" max="100" value="50">
+        
+        <label>音量ブースト (Gain): <span id="gainVal">10</span></label>
+        <input type="range" id="gainRange" min="1" max="50" value="10">
 
-            <!-- Editor Section -->
-            <div id="editor" class="hidden space-y-8 animate-in fade-in duration-500">
-                <div class="relative rounded-xl overflow-hidden bg-black aspect-video flex items-center justify-center border border-zinc-800">
-                    <video id="preview-video" class="w-full h-full" playsinline></video>
-                    <div id="overlay" class="absolute inset-0 pointer-events-none bg-red-600/10 hidden"></div>
-                </div>
-
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-8 bg-zinc-800/50 p-6 rounded-2xl">
-                    <div class="space-y-4">
-                        <div class="flex justify-between items-center">
-                            <label class="text-xs font-black text-red-500 uppercase tracking-widest">音割れレベル (Gain)</label>
-                            <span id="gain-val" class="text-xl font-mono text-white">30</span>
-                        </div>
-                        <input type="range" id="gain-slider" min="1" max="100" value="30" class="w-full h-2 bg-zinc-700 rounded-lg appearance-none cursor-pointer">
-                        <div class="flex justify-between text-[10px] text-zinc-500 font-bold uppercase">
-                            <span>Mildly Loud</span>
-                            <span>Earrape</span>
-                            <span>Nuclear</span>
-                        </div>
-                    </div>
-
-                    <div class="flex flex-col justify-end">
-                        <button id="record-btn" class="bg-red-600 hover:bg-red-700 active:scale-95 transition-all text-white font-black py-4 rounded-xl text-xl uppercase tracking-tighter shadow-lg shadow-red-900/20">
-                            動画を生成して保存
-                        </button>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Progress Section -->
-            <div id="progress-container" class="hidden py-10 space-y-6">
-                <div class="h-4 bg-zinc-800 rounded-full overflow-hidden">
-                    <div id="progress-bar" class="h-full bg-red-600 w-0 transition-all duration-300"></div>
-                </div>
-                <p class="text-center font-black text-red-500 text-2xl italic animate-pulse">GENERATING CHAOS...</p>
-                <p class="text-center text-zinc-500 text-xs uppercase">※録画中にタブを閉じないでください</p>
-            </div>
-
-            <!-- Result Section -->
-            <div id="result" class="hidden space-y-6 text-center">
-                <div class="bg-green-600/20 border border-green-600/40 p-4 rounded-xl">
-                    <p class="text-green-500 font-bold">動画の生成が完了しました！</p>
-                </div>
-                <video id="final-video" class="w-full rounded-xl border border-zinc-800" controls></video>
-                <div class="flex gap-4">
-                    <a id="download-link" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-black py-4 rounded-xl text-lg uppercase transition-colors">
-                        保存する
-                    </a>
-                    <button onclick="location.reload()" class="px-8 bg-zinc-800 hover:bg-zinc-700 text-white font-bold rounded-xl transition-colors">
-                        戻る
-                    </button>
-                </div>
-            </div>
-        </div>
-
-        <footer class="mt-10 text-center text-zinc-600 text-[10px] uppercase tracking-widest">
-            <p>※音量に十分注意して使用してください。聴覚への影響に責任は負いかねます。</p>
-        </footer>
+        <button id="processBtn" disabled>動画を生成・保存する</button>
     </div>
 
-    <!-- UI Message -->
-    <div id="toast" class="fixed bottom-10 bg-white text-black px-6 py-3 rounded-full font-bold shadow-2xl hidden transition-all"></div>
+    <div id="status" class="status"></div>
+    <video id="preview" controls style="display:none;"></video>
+</div>
 
-    <script>
-        const input = document.getElementById('video-input');
-        const dropZone = document.getElementById('drop-zone');
-        const editor = document.getElementById('editor');
-        const previewVideo = document.getElementById('preview-video');
-        const gainSlider = document.getElementById('gain-slider');
-        const gainVal = document.getElementById('gain-val');
-        const recordBtn = document.getElementById('record-btn');
-        const progressContainer = document.getElementById('progress-container');
-        const progressBar = document.getElementById('progress-bar');
-        const result = document.getElementById('result');
-        const finalVideo = document.getElementById('final-video');
-        const downloadLink = document.getElementById('download-link');
-        const toast = document.getElementById('toast');
-        const overlay = document.getElementById('overlay');
-        const title = document.getElementById('main-title');
+<script>
+    const upload = document.getElementById('upload');
+    const processBtn = document.getElementById('processBtn');
+    const distRange = document.getElementById('distRange');
+    const gainRange = document.getElementById('gainRange');
+    const distVal = document.getElementById('distVal');
+    const gainVal = document.getElementById('gainVal');
+    const status = document.getElementById('status');
+    const preview = document.getElementById('preview');
 
-        let audioCtx, source, gainNode, dest;
-        let isRecording = false;
+    let videoBlobUrl = null;
 
-        function showToast(msg) {
-            toast.innerText = msg;
-            toast.classList.remove('hidden');
-            setTimeout(() => toast.classList.add('hidden'), 3000);
+    distRange.oninput = () => distVal.textContent = distRange.value;
+    gainRange.oninput = () => gainVal.textContent = gainRange.value;
+
+    upload.onchange = (e) => {
+        if (e.target.files[0]) processBtn.disabled = false;
+    };
+
+    async function processVideo() {
+        const file = upload.files[0];
+        if (!file) return;
+
+        processBtn.disabled = true;
+        status.textContent = "処理中... (動画の長さによっては時間がかかります)";
+
+        const videoEl = document.createElement('video');
+        videoEl.src = URL.createObjectURL(file);
+        videoEl.muted = true;
+        await videoEl.play();
+
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const source = audioCtx.createMediaElementSource(videoEl);
+        
+        // --- 音割れエフェクトの構築 ---
+        const distNode = audioCtx.createWaveShaper();
+        const gainNode = audioCtx.createGain();
+
+        // 歪み曲線の生成
+        function makeDistortionCurve(amount) {
+            const k = amount;
+            const n_samples = 44100;
+            const curve = new Float32Array(n_samples);
+            const deg = Math.PI / 180;
+            for (let i = 0 ; i < n_samples; ++i ) {
+                const x = i * 2 / n_samples - 1;
+                curve[i] = ( 3 + k ) * x * 20 * deg / ( Math.PI + k * Math.abs(x) );
+            }
+            return curve;
         }
 
-        // Initialize Web Audio
-        async function initAudio() {
-            if (!audioCtx) {
-                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-                source = audioCtx.createMediaElementSource(previewVideo);
-                gainNode = audioCtx.createGain();
-                dest = audioCtx.createMediaStreamDestination();
+        distNode.curve = makeDistortionCurve(distRange.value * 10);
+        distNode.oversample = '4x';
+        gainNode.gain.value = gainRange.value;
 
-                source.connect(gainNode);
-                gainNode.connect(audioCtx.destination);
-                gainNode.connect(dest);
-            }
-            if (audioCtx.state === 'suspended') await audioCtx.resume();
-        }
+        // 接続
+        source.connect(distNode);
+        distNode.connect(gainNode);
 
-        // File Selection Logic
-        dropZone.onclick = () => input.click();
-        input.onchange = (e) => {
-            const file = e.target.files[0];
-            if (file) {
-                previewVideo.src = URL.createObjectURL(file);
-                dropZone.classList.add('hidden');
-                editor.classList.remove('hidden');
-                showToast("動画を読み込みました");
-            }
+        // 録画の準備
+        const dest = audioCtx.createMediaStreamDestination();
+        gainNode.connect(dest);
+
+        const videoStream = videoEl.captureStream();
+        const combinedStream = new MediaStream([
+            ...videoStream.getVideoTracks(),
+            ...dest.stream.getAudioTracks()
+        ]);
+
+        const recorder = new MediaRecorder(combinedStream, { mimeType: 'video/webm' });
+        const chunks = [];
+
+        recorder.ondataavailable = (e) => chunks.push(e.data);
+        recorder.onstop = () => {
+            const resultBlob = new Blob(chunks, { type: 'video/webm' });
+            const resultUrl = URL.createObjectURL(resultBlob);
+            
+            preview.src = resultUrl;
+            preview.style.display = "block";
+            status.textContent = "完成！ 下の動画を右クリックで保存するか、再生して確認してください。";
+
+            const downloadLink = document.createElement('a');
+            downloadLink.href = resultUrl;
+            downloadLink.download = "ear_rape_video.webm";
+            downloadLink.textContent = "【ここをクリックして保存】";
+            downloadLink.style.display = "block";
+            downloadLink.style.marginTop = "10px";
+            downloadLink.style.color = "#00ff00";
+            status.appendChild(downloadLink);
+            
+            processBtn.disabled = false;
         };
 
-        // Gain Slider Change
-        gainSlider.oninput = () => {
-            const val = gainSlider.value;
-            gainVal.innerText = val;
-            if (gainNode) {
-                // Exponential gain for extreme distortion
-                gainNode.gain.value = Math.pow(val / 10, 2.5);
-            }
-            if (val > 60) {
-                title.classList.add('extreme-shake');
-                overlay.classList.remove('hidden');
-            } else {
-                title.classList.remove('extreme-shake');
-                overlay.classList.add('hidden');
-            }
+        recorder.start();
+        videoEl.onended = () => {
+            recorder.stop();
+            audioCtx.close();
         };
 
-        // Recording Process
-        recordBtn.onclick = async () => {
-            try {
-                await initAudio();
-                
-                // Cross-browser captureStream support
-                const streamFunc = previewVideo.captureStream || previewVideo.mozCaptureStream;
-                if (!streamFunc) {
-                    throw new Error("お使いのブラウザでは動画キャプチャがサポートされていません。ChromeやFirefoxをお使いください。");
-                }
+        // 動画の最後まで再生
+        videoEl.currentTime = 0;
+        videoEl.play();
+    }
 
-                isRecording = true;
-                editor.classList.add('hidden');
-                progressContainer.classList.remove('hidden');
+    processBtn.onclick = processVideo;
+</script>
 
-                const vStream = streamFunc.call(previewVideo);
-                const combinedStream = new MediaStream([
-                    ...vStream.getVideoTracks(),
-                    ...dest.stream.getAudioTracks()
-                ]);
-
-                // Try to find a supported mimeType
-                const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9,opus') 
-                    ? 'video/webm;codecs=vp9,opus' 
-                    : 'video/webm';
-
-                const recorder = new MediaRecorder(combinedStream, { mimeType });
-                const chunks = [];
-
-                recorder.ondataavailable = e => chunks.push(e.data);
-                recorder.onstop = () => {
-                    const blob = new Blob(chunks, { type: 'video/webm' });
-                    const url = URL.createObjectURL(blob);
-                    finalVideo.src = url;
-                    downloadLink.href = url;
-                    downloadLink.download = `earrape_${Date.now()}.webm`;
-                    
-                    progressContainer.classList.add('hidden');
-                    result.classList.remove('hidden');
-                    isRecording = false;
-                };
-
-                // Prepare and Start
-                previewVideo.currentTime = 0;
-                previewVideo.muted = false;
-                previewVideo.volume = 0.1; // Preview volume low, but signal to gainNode is high
-                
-                recorder.start();
-
-                const trackProgress = () => {
-                    if (!isRecording) return;
-                    const percent = (previewVideo.currentTime / previewVideo.duration) * 100;
-                    progressBar.style.width = `${percent}%`;
-
-                    if (previewVideo.ended) {
-                        recorder.stop();
-                        previewVideo.pause();
-                    } else {
-                        requestAnimationFrame(trackProgress);
-                    }
-                };
-
-                previewVideo.play().then(trackProgress).catch(err => {
-                    showToast("再生エラー: 再度お試しください");
-                    isRecording = false;
-                    progressContainer.classList.add('hidden');
-                    editor.classList.remove('hidden');
-                });
-
-            } catch (err) {
-                showToast(err.message);
-                console.error(err);
-            }
-        };
-
-        // Drag & Drop
-        dropZone.ondragover = (e) => { e.preventDefault(); dropZone.classList.add('border-red-600'); };
-        dropZone.ondragleave = () => { dropZone.classList.remove('border-red-600'); };
-        dropZone.ondrop = (e) => {
-            e.preventDefault();
-            const file = e.dataTransfer.files[0];
-            if (file && file.type.startsWith('video/')) {
-                input.files = e.dataTransfer.files;
-                input.onchange({ target: input });
-            }
-        };
-    </script>
 </body>
 </html>
-
