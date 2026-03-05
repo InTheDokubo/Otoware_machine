@@ -3,146 +3,146 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>超音割れビデオメーカー</title>
+    <title>ULTRA EAR RAPE MACHINE</title>
     <style>
-        body { font-family: sans-serif; background: #1a1a1a; color: white; display: flex; flex-direction: column; align-items: center; padding: 20px; }
-        .container { max-width: 600px; width: 100%; background: #2a2a2a; padding: 20px; border-radius: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.5); text-align: center; }
-        video { width: 100%; margin-top: 20px; border-radius: 5px; background: #000; }
-        .controls { margin-top: 20px; display: flex; flex-direction: column; gap: 15px; }
-        button { padding: 10px 20px; cursor: pointer; border: none; border-radius: 5px; background: #ff4757; color: white; font-weight: bold; transition: 0.3s; }
-        button:disabled { background: #555; cursor: not-allowed; }
-        button:hover:not(:disabled) { background: #ff6b81; }
-        input[type="range"] { width: 100%; }
-        .status { margin-top: 10px; font-size: 0.9em; color: #ffa502; }
+        body { font-family: 'Arial Black', sans-serif; background: #000; color: #f00; text-align: center; padding: 20px; }
+        .main-card { border: 5px solid #f00; background: #111; padding: 20px; max-width: 800px; margin: auto; box-shadow: 0 0 20px #f00; }
+        video { width: 100%; border: 2px solid #fff; margin: 15px 0; background: #222; }
+        .controls { display: grid; gap: 15px; margin: 20px 0; background: #222; padding: 15px; border-radius: 8px; }
+        input[type="range"] { width: 100%; cursor: pointer; accent-color: #f00; }
+        .btn-group { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+        button { padding: 15px 30px; font-size: 1.1rem; font-weight: bold; cursor: pointer; border: none; border-radius: 5px; transition: 0.2s; }
+        #playBtn { background: #00ff00; color: #000; }
+        #recordBtn { background: #ff0000; color: #fff; }
+        button:disabled { background: #444; color: #888; cursor: not-allowed; }
+        .warning { color: yellow; font-size: 0.8rem; margin-bottom: 10px; }
     </style>
 </head>
 <body>
 
-<div class="container">
-    <h1>🔊 超音割れメーカー</h1>
-    <p>動画を読み込んで、音を破壊します。</p>
+<div class="main-card">
+    <h1>⚠️ 音量注意：超音割れ ⚠️</h1>
+    <p class="warning">※スピーカーの破損にご注意ください。爆音が出ます。</p>
 
-    <input type="file" id="upload" accept="video/*">
-    
+    <input type="file" id="fileInput" accept="video/*">
+
     <div class="controls">
-        <label>音割れ強度 (Distortion): <span id="distVal">50</span></label>
-        <input type="range" id="distRange" min="1" max="100" value="50">
+        <label>音の歪み (Distortion): <span id="distLabel">100</span></label>
+        <input type="range" id="distRange" min="1" max="200" value="100">
         
-        <label>音量ブースト (Gain): <span id="gainVal">10</span></label>
-        <input type="range" id="gainRange" min="1" max="50" value="10">
-
-        <button id="processBtn" disabled>動画を生成・保存する</button>
+        <label>爆音ブースト (Gain): <span id="gainLabel">30</span></label>
+        <input type="range" id="gainRange" min="1" max="100" value="30">
     </div>
 
-    <div id="status" class="status"></div>
-    <video id="preview" controls style="display:none;"></video>
+    <div class="btn-group">
+        <button id="playBtn">🔊 プレビュー再生</button>
+        <button id="recordBtn" disabled>💾 加工して保存用生成</button>
+    </div>
+
+    <p id="status"></p>
+    <video id="videoPlayer" crossorigin="anonymous"></video>
 </div>
 
 <script>
-    const upload = document.getElementById('upload');
-    const processBtn = document.getElementById('processBtn');
+    const fileInput = document.getElementById('fileInput');
+    const video = document.getElementById('videoPlayer');
+    const playBtn = document.getElementById('playBtn');
+    const recordBtn = document.getElementById('recordBtn');
     const distRange = document.getElementById('distRange');
     const gainRange = document.getElementById('gainRange');
-    const distVal = document.getElementById('distVal');
-    const gainVal = document.getElementById('gainVal');
     const status = document.getElementById('status');
-    const preview = document.getElementById('preview');
 
-    let videoBlobUrl = null;
+    let audioCtx, source, distortion, gainNode, dest;
 
-    distRange.oninput = () => distVal.textContent = distRange.value;
-    gainRange.oninput = () => gainVal.textContent = gainRange.value;
+    // 数値表示の更新
+    distRange.oninput = () => document.getElementById('distLabel').innerText = distRange.value;
+    gainRange.oninput = () => document.getElementById('gainLabel').innerText = gainRange.value;
 
-    upload.onchange = (e) => {
-        if (e.target.files[0]) processBtn.disabled = false;
-    };
+    function initAudio() {
+        if (audioCtx) return;
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        source = audioCtx.createMediaElementSource(video);
+        distortion = audioCtx.createWaveShaper();
+        gainNode = audioCtx.createGain();
+        dest = audioCtx.createMediaStreamDestination();
 
-    async function processVideo() {
-        const file = upload.files[0];
-        if (!file) return;
-
-        processBtn.disabled = true;
-        status.textContent = "処理中... (動画の長さによっては時間がかかります)";
-
-        const videoEl = document.createElement('video');
-        videoEl.src = URL.createObjectURL(file);
-        videoEl.muted = true;
-        await videoEl.play();
-
-        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        const source = audioCtx.createMediaElementSource(videoEl);
-        
-        // --- 音割れエフェクトの構築 ---
-        const distNode = audioCtx.createWaveShaper();
-        const gainNode = audioCtx.createGain();
-
-        // 歪み曲線の生成
-        function makeDistortionCurve(amount) {
-            const k = amount;
-            const n_samples = 44100;
-            const curve = new Float32Array(n_samples);
-            const deg = Math.PI / 180;
-            for (let i = 0 ; i < n_samples; ++i ) {
-                const x = i * 2 / n_samples - 1;
-                curve[i] = ( 3 + k ) * x * 20 * deg / ( Math.PI + k * Math.abs(x) );
-            }
-            return curve;
-        }
-
-        distNode.curve = makeDistortionCurve(distRange.value * 10);
-        distNode.oversample = '4x';
+        // 激しく歪ませるカーブ作成
+        distortion.curve = makeDistortionCurve(distRange.value * 10);
+        distortion.oversample = '4x';
         gainNode.gain.value = gainRange.value;
 
-        // 接続
-        source.connect(distNode);
-        distNode.connect(gainNode);
-
-        // 録画の準備
-        const dest = audioCtx.createMediaStreamDestination();
+        // プレビュー用にスピーカー(destination)と、録音用に(dest)の両方に繋ぐ
+        source.connect(distortion);
+        distortion.connect(gainNode);
+        gainNode.connect(audioCtx.destination);
         gainNode.connect(dest);
+    }
 
-        const videoStream = videoEl.captureStream();
-        const combinedStream = new MediaStream([
-            ...videoStream.getVideoTracks(),
+    function makeDistortionCurve(amount) {
+        let n_samples = 44100, curve = new Float32Array(n_samples);
+        for (let i = 0 ; i < n_samples; ++i ) {
+            let x = i * 2 / n_samples - 1;
+            curve[i] = (3 + amount) * x * Math.PI / (Math.PI + amount * Math.abs(x));
+        }
+        return curve;
+    }
+
+    fileInput.onchange = () => {
+        const file = fileInput.files[0];
+        if (file) {
+            video.src = URL.createObjectURL(file);
+            recordBtn.disabled = false;
+            status.innerText = "動画を読み込みました。";
+        }
+    };
+
+    // プレビュー再生
+    playBtn.onclick = async () => {
+        initAudio();
+        // スライダーの値を反映
+        distortion.curve = makeDistortionCurve(distRange.value * 10);
+        gainNode.gain.value = gainRange.value;
+        
+        if (audioCtx.state === 'suspended') await audioCtx.resume();
+        video.play();
+        status.innerText = "爆音プレビュー中...";
+    };
+
+    // 録画と保存（どのブラウザでもダウンロードを強制する）
+    recordBtn.onclick = () => {
+        initAudio();
+        video.currentTime = 0;
+        video.play();
+        status.innerText = "録画中... 最後まで再生されるのを待ってください。";
+
+        const stream = video.captureStream();
+        const combined = new MediaStream([
+            ...stream.getVideoTracks(),
             ...dest.stream.getAudioTracks()
         ]);
 
-        const recorder = new MediaRecorder(combinedStream, { mimeType: 'video/webm' });
+        const recorder = new MediaRecorder(combined, { mimeType: 'video/webm' });
         const chunks = [];
 
-        recorder.ondataavailable = (e) => chunks.push(e.data);
+        recorder.ondataavailable = e => chunks.push(e.data);
         recorder.onstop = () => {
-            const resultBlob = new Blob(chunks, { type: 'video/webm' });
-            const resultUrl = URL.createObjectURL(resultBlob);
+            const blob = new Blob(chunks, { type: 'video/webm' });
+            const url = URL.createObjectURL(blob);
             
-            preview.src = resultUrl;
-            preview.style.display = "block";
-            status.textContent = "完成！ 下の動画を右クリックで保存するか、再生して確認してください。";
-
-            const downloadLink = document.createElement('a');
-            downloadLink.href = resultUrl;
-            downloadLink.download = "ear_rape_video.webm";
-            downloadLink.textContent = "【ここをクリックして保存】";
-            downloadLink.style.display = "block";
-            downloadLink.style.marginTop = "10px";
-            downloadLink.style.color = "#00ff00";
-            status.appendChild(downloadLink);
+            // 強制ダウンロード処理
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = "ear_rape_result.webm";
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
             
-            processBtn.disabled = false;
+            status.innerText = "保存が完了しました！";
         };
 
         recorder.start();
-        videoEl.onended = () => {
-            recorder.stop();
-            audioCtx.close();
-        };
-
-        // 動画の最後まで再生
-        videoEl.currentTime = 0;
-        videoEl.play();
-    }
-
-    processBtn.onclick = processVideo;
+        video.onended = () => recorder.stop();
+    };
 </script>
 
 </body>
