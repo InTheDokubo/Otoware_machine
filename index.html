@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>PDCyclAr - モダンPDCAツール</title>
+    <title>PDCyclAr</title>
     
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -26,7 +26,7 @@
     <!-- Babel for JSX -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
-    <!-- Phosphor Icons (Web Font版: Reactと競合しない安全なアイコン) -->
+    <!-- Phosphor Icons -->
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
 
     <style>
@@ -36,12 +36,14 @@
         ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
         ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
         
-        .animate-in { animation-duration: 0.3s; animation-fill-mode: forwards; }
+        .animate-in { animation-duration: 0.2s; animation-fill-mode: forwards; }
         .fade-in { animation-name: fadeIn; }
         .slide-in-bottom { animation-name: slideInBottom; }
+        .zoom-in { animation-name: zoomIn; }
         
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
         @keyframes slideInBottom { from { transform: translateY(10px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        @keyframes zoomIn { from { transform: scale(0.95); opacity: 0; } to { transform: scale(1); opacity: 1; } }
     </style>
 </head>
 <body>
@@ -50,7 +52,6 @@
     <script type="text/babel">
         const { useState, useMemo, useEffect, useRef } = React;
 
-        // --- PDCyclAr カスタムロゴ ---
         const Logo = ({ size = 24, color = "currentColor", className = "" }) => (
             <svg width={size} height={size} viewBox="0 0 100 100" style={{ color }} className={className} xmlns="http://www.w3.org/2000/svg">
                 <g>
@@ -63,54 +64,34 @@
             </svg>
         );
 
-        // --- 初期モックデータ ---
-        const initialFolders = [
-            { id: 'f1', name: '💻 プロジェクト' },
-            { id: 'f2', name: '🌱 自己研鑽' }
-        ];
-
+        const initialFolders = [{ id: 'f1', name: '💻 プロジェクト', parentId: null }, { id: 'f2', name: '🌱 自己研鑽', parentId: null }];
         const initialSystems = [
             { id: 's1', folderId: 'f1', title: 'PDCyclAr ツール開発' },
             { id: 's3', folderId: 'f2', title: '英語学習（TOEIC）' }
         ];
+        const initialCycles = [{
+            id: 'c1', systemId: 's1', date: new Date().toISOString(),
+            plan: '要件定義とUI作成', do: '単一HTMLで動くように実装した。',
+            check: '機能は十分だが、追加や編集がしにくい部分があった。', action: '3点ボタンと専用モーダルを追加して操作性を上げる。'
+        }];
 
-        const initialCycles = [
-            {
-                id: 'c1', systemId: 's1', date: new Date().toISOString(),
-                plan: 'ツールの要件定義とUIの作成',
-                do: '要件を整理し、単一HTMLで動くように実装した。',
-                check: 'localStorageによる保存機能を追加したことで、個人利用には十分な形になった。',
-                action: 'しばらく自分で使いながら、バグや使いにくい部分を洗い出す。'
-            }
-        ];
-
-        const STORAGE_KEY = 'pdcyclar_data_v1';
-        
+        const STORAGE_KEY = 'pdcyclar_data_v3';
         const loadData = () => {
             try {
                 const data = localStorage.getItem(STORAGE_KEY);
                 if (data) return JSON.parse(data);
-            } catch (e) {
-                console.error("Failed to load data", e);
-            }
+            } catch (e) { console.error(e); }
             return { folders: initialFolders, systems: initialSystems, cycles: initialCycles };
         };
-
         const saveData = (folders, systems, cycles) => {
-            try {
-                localStorage.setItem(STORAGE_KEY, JSON.stringify({ folders, systems, cycles }));
-            } catch (e) {
-                console.error("Failed to save data", e);
-            }
+            try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ folders, systems, cycles })); } catch (e) { console.error(e); }
         };
 
         const App = () => {
             const [data, setData] = useState(loadData);
             const { folders, systems, cycles } = data;
 
-            useEffect(() => {
-                saveData(folders, systems, cycles);
-            }, [folders, systems, cycles]);
+            useEffect(() => { saveData(folders, systems, cycles); }, [folders, systems, cycles]);
 
             const [activeSystemId, setActiveSystemId] = useState(systems.length > 0 ? systems[0].id : null);
             const [editingCycleId, setEditingCycleId] = useState(null);
@@ -123,16 +104,33 @@
 
             const [formData, setFormData] = useState({ plan: '', do: '', check: '', action: '', date: '' });
 
+            // UIステート
             const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
             const [mobileView, setMobileView] = useState('sidebar'); 
             const [sidebarWidth, setSidebarWidth] = useState(300);
             const [isDragging, setIsDragging] = useState(false);
-            const [confirmModal, setConfirmModal] = useState({ isOpen: false, title: '', message: '', onConfirm: null });
+            
+            // 3点メニュー（ドロップダウン）の管理
+            const [activeDropdown, setActiveDropdown] = useState(null);
 
+            // モーダル管理
+            const [confirmModal, setConfirmModal] = useState({ isOpen: false, title: '', message: '', isDanger: true, onConfirm: null });
+            const [inputModal, setInputModal] = useState({ 
+                isOpen: false, title: '', placeholder: '', value: '', 
+                onConfirm: null 
+            });
+
+            // リサイズ・クリック外イベント
             useEffect(() => {
                 const handleResize = () => setIsMobile(window.innerWidth < 768);
                 window.addEventListener('resize', handleResize);
                 return () => window.removeEventListener('resize', handleResize);
+            }, []);
+
+            useEffect(() => {
+                const handleClickOutside = () => setActiveDropdown(null);
+                document.addEventListener('click', handleClickOutside);
+                return () => document.removeEventListener('click', handleClickOutside);
             }, []);
 
             useEffect(() => {
@@ -141,7 +139,6 @@
                     setSidebarWidth(Math.max(200, Math.min(e.clientX, 600)));
                 };
                 const handleMouseUp = () => setIsDragging(false);
-
                 if (isDragging) {
                     document.addEventListener('mousemove', handleMouseMove);
                     document.addEventListener('mouseup', handleMouseUp);
@@ -154,9 +151,7 @@
 
             const activeSystem = useMemo(() => systems.find(s => s.id === activeSystemId), [systems, activeSystemId]);
             const activeCycles = useMemo(() => {
-                return cycles
-                    .filter(c => c.systemId === activeSystemId)
-                    .sort((a, b) => new Date(b.date) - new Date(a.date));
+                return cycles.filter(c => c.systemId === activeSystemId).sort((a, b) => new Date(b.date) - new Date(a.date));
             }, [cycles, activeSystemId]);
 
             const updateState = (newFolders, newSystems, newCycles) => {
@@ -173,63 +168,115 @@
                 if (isMobile) setMobileView('main');
             };
 
-            const handleCreateSystem = (folderId) => {
-                const title = prompt('新しいサイクル系統のタイトルを入力してください:');
-                if (title) {
-                    const newSystem = { id: `s${Date.now()}`, folderId, title };
-                    updateState(folders, [...systems, newSystem], cycles);
-                    handleSelectSystem(newSystem.id);
-                }
+            // --- 入力・作成処理 (Input Modal利用) ---
+            const openCreateFolder = (parentId = null) => {
+                setInputModal({
+                    isOpen: true, title: parentId ? 'サブフォルダを作成' : '新しいフォルダを作成', placeholder: 'フォルダ名', value: '',
+                    onConfirm: (name) => {
+                        const newFolder = { id: `f${Date.now()}`, name, parentId };
+                        updateState([...folders, newFolder], systems, cycles);
+                        setExpandedFolders(prev => ({ ...prev, [newFolder.id]: true }));
+                        if (parentId) {
+                            setExpandedFolders(prev => ({ ...prev, [parentId]: true }));
+                        }
+                    }
+                });
             };
 
-            const handleCreateFolder = () => {
-                const name = prompt('新しいフォルダ名を入力してください:');
-                if (name) {
-                    const newFolder = { id: `f${Date.now()}`, name };
-                    updateState([...folders, newFolder], systems, cycles);
-                    setExpandedFolders(prev => ({ ...prev, [newFolder.id]: true }));
-                }
+            const openRenameFolder = (folder) => {
+                setInputModal({
+                    isOpen: true, title: 'フォルダ名を変更', placeholder: 'フォルダ名', value: folder.name,
+                    onConfirm: (name) => {
+                        updateState(folders.map(f => f.id === folder.id ? { ...f, name } : f), systems, cycles);
+                    }
+                });
             };
 
-            const requestDeleteSystem = (systemId, systemTitle, e) => {
-                e.stopPropagation();
+            const openCreateSystem = (folderId) => {
+                setInputModal({
+                    isOpen: true, title: '新しいサイクル系統を作成', placeholder: 'テーマやタイトル', value: '',
+                    onConfirm: (title) => {
+                        const newSystem = { id: `s${Date.now()}`, folderId, title };
+                        updateState(folders, [...systems, newSystem], cycles);
+                        handleSelectSystem(newSystem.id);
+                        if (!expandedFolders[folderId]) toggleFolder(folderId);
+                    }
+                });
+            };
+
+            const openRenameSystem = (system) => {
+                setInputModal({
+                    isOpen: true, title: 'サイクル系統の名前を変更', placeholder: 'テーマやタイトル', value: system.title,
+                    onConfirm: (title) => {
+                        updateState(folders, systems.map(s => s.id === system.id ? { ...s, title } : s), cycles);
+                    }
+                });
+            };
+
+            // --- 削除処理 (Confirm Modal利用) ---
+            const requestDeleteFolder = (folder) => {
                 setConfirmModal({
-                    isOpen: true,
-                    title: 'サイクル系統の削除',
-                    message: `「${systemTitle}」と、その中に含まれるすべてのサイクルを削除しますか？`,
+                    isOpen: true, title: 'フォルダの削除', isDanger: true,
+                    message: `「${folder.name}」と、中に含まれるすべてのサブフォルダ・サイクル系統・サイクルを削除しますか？`,
                     onConfirm: () => {
-                        const newSystems = systems.filter(s => s.id !== systemId);
-                        const newCycles = cycles.filter(c => c.systemId !== systemId);
-                        updateState(folders, newSystems, newCycles);
-                        if (activeSystemId === systemId) setActiveSystemId(null);
-                        setConfirmModal({ isOpen: false, title: '', message: '', onConfirm: null });
+                        // 再帰的に削除すべきフォルダIDを収集
+                        const getFolderIdsToRemove = (fid) => {
+                            let ids = [fid];
+                            const children = folders.filter(f => f.parentId === fid);
+                            children.forEach(child => {
+                                ids = [...ids, ...getFolderIdsToRemove(child.id)];
+                            });
+                            return ids;
+                        };
+
+                        const folderIdsToRemove = getFolderIdsToRemove(folder.id);
+                        const targetSystemIds = systems.filter(s => folderIdsToRemove.includes(s.folderId)).map(s => s.id);
+                        
+                        updateState(
+                            folders.filter(f => !folderIdsToRemove.includes(f.id)),
+                            systems.filter(s => !targetSystemIds.includes(s.id)),
+                            cycles.filter(c => !targetSystemIds.includes(c.systemId))
+                        );
+                        if (targetSystemIds.includes(activeSystemId)) setActiveSystemId(null);
+                        setConfirmModal({ isOpen: false });
+                    }
+                });
+            };
+
+            const requestDeleteSystem = (system) => {
+                setConfirmModal({
+                    isOpen: true, title: 'サイクル系統の削除', isDanger: true,
+                    message: `「${system.title}」と、中に含まれるすべてのサイクルを削除しますか？`,
+                    onConfirm: () => {
+                        updateState(
+                            folders,
+                            systems.filter(s => s.id !== system.id),
+                            cycles.filter(c => c.systemId !== system.id)
+                        );
+                        if (activeSystemId === system.id) setActiveSystemId(null);
+                        setConfirmModal({ isOpen: false });
                     }
                 });
             };
 
             const requestDeleteCycle = (cycleId) => {
                 setConfirmModal({
-                    isOpen: true,
-                    title: 'サイクルの削除',
+                    isOpen: true, title: 'サイクルの削除', isDanger: true,
                     message: 'このサイクルを削除してもよろしいですか？',
                     onConfirm: () => {
                         updateState(folders, systems, cycles.filter(c => c.id !== cycleId));
-                        setConfirmModal({ isOpen: false, title: '', message: '', onConfirm: null });
+                        setConfirmModal({ isOpen: false });
                     }
                 });
             };
 
+            // --- サイクル操作 ---
             const getPreviousAction = () => {
-                const sortedCycles = cycles
-                    .filter(c => c.systemId === activeSystemId)
-                    .sort((a, b) => new Date(a.date) - new Date(b.date)); 
-                
+                const sortedCycles = cycles.filter(c => c.systemId === activeSystemId).sort((a, b) => new Date(a.date) - new Date(b.date)); 
                 if (sortedCycles.length === 0) return null;
                 if (editingCycleId === 'new') return sortedCycles[sortedCycles.length - 1].action;
-                
                 const currentIndex = sortedCycles.findIndex(c => c.id === editingCycleId);
                 if (currentIndex > 0) return sortedCycles[currentIndex - 1].action;
-                
                 return null;
             };
 
@@ -266,23 +313,126 @@
                 setEditingCycleId(null);
             };
 
-            const handleChange = (e) => {
-                const { name, value } = e.target;
-                setFormData(prev => ({ ...prev, [name]: value }));
+            const handleChange = (e) => setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
+            const previousAction = getPreviousAction();
+
+            // ドロップダウンのトグル
+            const toggleDropdown = (e, id) => {
+                e.stopPropagation();
+                setActiveDropdown(activeDropdown === id ? null : id);
             };
 
-            const previousAction = getPreviousAction();
+            // --- 再帰的なフォルダツリーのレンダリング ---
+            const renderFolderTree = (parentId = null) => {
+                // 古いデータには parentId がない可能性があるので、null 扱いにする
+                const targetFolders = folders.filter(f => (f.parentId || null) === parentId);
+                
+                return targetFolders.map(folder => {
+                    const folderSystems = systems.filter(s => s.folderId === folder.id);
+                    const childFolders = folders.filter(f => f.parentId === folder.id);
+                    const hasChildren = childFolders.length > 0 || folderSystems.length > 0;
+                    
+                    return (
+                        <div key={folder.id} className="mb-2">
+                            <div 
+                                className="flex items-center justify-between px-2 py-2 rounded-xl hover:bg-gray-100 cursor-pointer text-sm font-bold text-gray-700 transition-colors group/folder relative"
+                                onClick={() => toggleFolder(folder.id)}
+                            >
+                                <div className="flex items-center gap-2 overflow-hidden flex-1">
+                                    <i className={`ph ${expandedFolders[folder.id] ? "ph-caret-down" : "ph-caret-right"} text-gray-400 ${hasChildren ? '' : 'opacity-0'}`}></i>
+                                    <i className="ph ph-folder text-indigo-400 text-lg"></i>
+                                    <span className="truncate">{folder.name}</span>
+                                </div>
+                                
+                                <div className="flex items-center gap-1 opacity-100 md:opacity-0 md:group-hover/folder:opacity-100 transition-opacity">
+                                    <button 
+                                        onClick={(e) => { e.stopPropagation(); openCreateSystem(folder.id); }}
+                                        className="p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-white rounded-lg transition-colors shadow-sm border border-transparent hover:border-gray-200"
+                                        title="新規サイクル系統"
+                                    >
+                                        <i className="ph ph-plus text-sm"></i>
+                                    </button>
+                                    <button 
+                                        onClick={(e) => toggleDropdown(e, `folder-${folder.id}`)}
+                                        className={`p-1.5 rounded-lg transition-colors shadow-sm border ${activeDropdown === `folder-${folder.id}` ? 'bg-white text-indigo-600 border-gray-200' : 'text-gray-400 hover:text-gray-700 hover:bg-white border-transparent hover:border-gray-200'}`}
+                                    >
+                                        <i className="ph ph-dots-three-vertical text-sm font-bold"></i>
+                                    </button>
+                                </div>
+
+                                {/* フォルダ 3点メニュー */}
+                                {activeDropdown === `folder-${folder.id}` && (
+                                    <div className="absolute right-0 top-full mt-1 w-48 bg-white border border-gray-100 rounded-xl shadow-lg z-50 py-1.5 animate-in fade-in zoom-in" onClick={e => e.stopPropagation()}>
+                                        <button onClick={() => { openCreateFolder(folder.id); setActiveDropdown(null); }} className="w-full flex items-center gap-2 text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 font-medium">
+                                            <i className="ph ph-folder-plus"></i> サブフォルダを作成
+                                        </button>
+                                        <button onClick={() => { openRenameFolder(folder); setActiveDropdown(null); }} className="w-full flex items-center gap-2 text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 font-medium">
+                                            <i className="ph ph-pencil-simple"></i> 名前を変更
+                                        </button>
+                                        <div className="h-px bg-gray-100 my-1"></div>
+                                        <button onClick={() => { requestDeleteFolder(folder); setActiveDropdown(null); }} className="w-full flex items-center gap-2 text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 font-medium">
+                                            <i className="ph ph-trash"></i> 削除
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+
+                            {expandedFolders[folder.id] && (
+                                <div className="ml-5 mt-1 space-y-1 border-l-2 border-gray-100 pl-2">
+                                    {/* 子フォルダの再帰呼び出し */}
+                                    {renderFolderTree(folder.id)}
+                                    
+                                    {/* このフォルダ直下のサイクル系統 */}
+                                    {folderSystems.map(system => (
+                                        <div
+                                            key={system.id}
+                                            onClick={() => handleSelectSystem(system.id)}
+                                            className={`group/sys relative flex items-center justify-between px-3 py-2.5 rounded-xl cursor-pointer text-sm transition-all
+                                                ${activeSystemId === system.id && !isMobile ? 'bg-indigo-50 text-indigo-700 font-bold shadow-sm ring-1 ring-indigo-100' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900 font-medium'}
+                                            `}
+                                        >
+                                            <div className="flex items-center gap-2 overflow-hidden">
+                                                <i className={`ph ph-file-text text-base shrink-0 ${activeSystemId === system.id && !isMobile ? 'text-indigo-500' : 'text-gray-400'}`}></i>
+                                                <span className="truncate">{system.title}</span>
+                                            </div>
+                                            <button 
+                                                onClick={(e) => toggleDropdown(e, `sys-${system.id}`)}
+                                                className={`p-1.5 rounded-lg transition-colors opacity-100 md:opacity-0 md:group-hover/sys:opacity-100 ${activeDropdown === `sys-${system.id}` ? 'bg-white text-indigo-600 shadow-sm opacity-100' : 'text-gray-400 hover:text-gray-700 hover:bg-white hover:shadow-sm'}`}
+                                            >
+                                                <i className="ph ph-dots-three-vertical text-sm font-bold"></i>
+                                            </button>
+
+                                            {/* システム 3点メニュー */}
+                                            {activeDropdown === `sys-${system.id}` && (
+                                                <div className="absolute right-0 top-full mt-1 w-40 bg-white border border-gray-100 rounded-xl shadow-lg z-50 py-1.5 animate-in fade-in zoom-in" onClick={e => e.stopPropagation()}>
+                                                    <button onClick={() => { openRenameSystem(system); setActiveDropdown(null); }} className="w-full flex items-center gap-2 text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 font-medium">
+                                                        <i className="ph ph-pencil-simple"></i> 名前を変更
+                                                    </button>
+                                                    <div className="h-px bg-gray-100 my-1"></div>
+                                                    <button onClick={() => { requestDeleteSystem(system); setActiveDropdown(null); }} className="w-full flex items-center gap-2 text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 font-medium">
+                                                        <i className="ph ph-trash"></i> 削除
+                                                    </button>
+                                                </div>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    );
+                });
+            };
 
             return (
                 <div className={`flex h-screen bg-gray-50 text-gray-800 font-sans overflow-hidden ${isDragging ? 'select-none cursor-col-resize' : ''}`}>
                     
-                    {/* モーダル */}
+                    {/* 確認モーダル */}
                     {confirmModal.isOpen && (
                         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-in fade-in">
-                            <div className="bg-white rounded-xl shadow-xl max-w-sm w-full overflow-hidden">
+                            <div className="bg-white rounded-2xl shadow-xl max-w-sm w-full overflow-hidden animate-in zoom-in">
                                 <div className="p-5 flex gap-4">
-                                    <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center shrink-0">
-                                        <i className="ph ph-warning text-xl text-red-600"></i>
+                                    <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${confirmModal.isDanger ? 'bg-red-100 text-red-600' : 'bg-blue-100 text-blue-600'}`}>
+                                        <i className={`ph ${confirmModal.isDanger ? 'ph-warning' : 'ph-info'} text-xl`}></i>
                                     </div>
                                     <div>
                                         <h3 className="text-lg font-bold text-gray-900">{confirmModal.title}</h3>
@@ -290,11 +440,48 @@
                                     </div>
                                 </div>
                                 <div className="px-5 py-4 bg-gray-50 flex justify-end gap-3 border-t border-gray-100">
-                                    <button onClick={() => setConfirmModal({ ...confirmModal, isOpen: false })} className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
+                                    <button onClick={() => setConfirmModal({ isOpen: false })} className="px-4 py-2 text-sm font-bold text-gray-700 bg-white border border-gray-300 rounded-xl hover:bg-gray-50 transition-colors">
                                         キャンセル
                                     </button>
-                                    <button onClick={confirmModal.onConfirm} className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 transition-colors shadow-sm">
-                                        削除する
+                                    <button onClick={confirmModal.onConfirm} className={`px-4 py-2 text-sm font-bold text-white rounded-xl shadow-sm transition-colors ${confirmModal.isDanger ? 'bg-red-600 hover:bg-red-700' : 'bg-indigo-600 hover:bg-indigo-700'}`}>
+                                        実行する
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* 入力モーダル */}
+                    {inputModal.isOpen && (
+                        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-in fade-in">
+                            <div className="bg-white rounded-2xl shadow-xl max-w-sm w-full overflow-hidden animate-in zoom-in">
+                                <div className="p-6">
+                                    <h3 className="text-lg font-bold text-gray-900 mb-4">{inputModal.title}</h3>
+                                    <input
+                                        type="text"
+                                        value={inputModal.value}
+                                        onChange={(e) => setInputModal({ ...inputModal, value: e.target.value })}
+                                        placeholder={inputModal.placeholder}
+                                        className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:bg-white focus:border-transparent outline-none transition-all font-medium"
+                                        autoFocus
+                                        onKeyDown={(e) => {
+                                            if (e.key === 'Enter' && inputModal.value.trim()) {
+                                                inputModal.onConfirm(inputModal.value.trim());
+                                                setInputModal({ isOpen: false });
+                                            }
+                                        }}
+                                    />
+                                </div>
+                                <div className="px-6 py-4 bg-gray-50 flex justify-end gap-3 border-t border-gray-100">
+                                    <button onClick={() => setInputModal({ isOpen: false })} className="px-4 py-2 text-sm font-bold text-gray-700 bg-white border border-gray-300 rounded-xl hover:bg-gray-50 transition-colors">
+                                        キャンセル
+                                    </button>
+                                    <button 
+                                        disabled={!inputModal.value.trim()}
+                                        onClick={() => { inputModal.onConfirm(inputModal.value.trim()); setInputModal({ isOpen: false }); }} 
+                                        className="px-5 py-2 text-sm font-bold text-white bg-indigo-600 rounded-xl hover:bg-indigo-700 transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                        決定
                                     </button>
                                 </div>
                             </div>
@@ -306,7 +493,7 @@
                         className={`
                             ${isMobile && mobileView === 'main' ? 'hidden' : 'flex'} 
                             ${isMobile ? 'w-full' : 'md:flex'} 
-                            flex-col h-full bg-white flex-shrink-0 relative z-10 border-r border-gray-200
+                            flex-col h-full bg-white flex-shrink-0 relative z-20 border-r border-gray-200
                         `}
                         style={{ width: isMobile ? '100%' : sidebarWidth }}
                     >
@@ -318,71 +505,26 @@
                         </div>
 
                         <div className="flex-1 overflow-y-auto p-3 md:p-4 pb-20">
-                            <div className="flex items-center justify-between mb-3 group px-1">
+                            <div className="flex items-center justify-between mb-3 group px-2">
                                 <span className="text-xs font-bold text-gray-400 tracking-wider uppercase">全てのサイクル</span>
-                                <button onClick={handleCreateFolder} className="text-gray-400 hover:text-indigo-600 md:opacity-0 md:group-hover:opacity-100 transition-opacity p-1 bg-gray-50 rounded-md">
+                                <button onClick={() => openCreateFolder(null)} className="text-gray-400 hover:text-indigo-600 transition-colors p-1 bg-gray-50 rounded-md shadow-sm border border-gray-100">
                                     <i className="ph ph-folder-plus text-lg"></i>
                                 </button>
                             </div>
 
-                            <div className="space-y-1">
-                                {folders.map(folder => (
-                                    <div key={folder.id} className="mb-3">
-                                        <div 
-                                            className="flex items-center justify-between px-2 py-2 rounded-lg hover:bg-gray-100 cursor-pointer text-sm font-semibold text-gray-700 transition-colors"
-                                            onClick={() => toggleFolder(folder.id)}
-                                        >
-                                            <div className="flex items-center gap-2">
-                                                <i className={`ph ${expandedFolders[folder.id] ? "ph-caret-down" : "ph-caret-right"} text-gray-400`}></i>
-                                                <i className="ph ph-folder text-indigo-400 text-lg"></i>
-                                                <span className="truncate">{folder.name}</span>
-                                            </div>
-                                            <button 
-                                                onClick={(e) => { e.stopPropagation(); handleCreateSystem(folder.id); }}
-                                                className="text-gray-400 hover:text-indigo-600 p-1 shrink-0"
-                                                title="このフォルダに新規系統を作成"
-                                            >
-                                                <i className="ph ph-plus text-base"></i>
-                                            </button>
-                                        </div>
-
-                                        {expandedFolders[folder.id] && (
-                                            <div className="ml-6 mt-1 space-y-0.5 border-l-2 border-gray-100 pl-2">
-                                                {systems.filter(s => s.folderId === folder.id).map(system => (
-                                                    <div
-                                                        key={system.id}
-                                                        onClick={() => handleSelectSystem(system.id)}
-                                                        className={`group flex items-center justify-between px-3 py-2.5 rounded-md cursor-pointer text-sm transition-all
-                                                            ${activeSystemId === system.id && !isMobile ? 'bg-indigo-50 text-indigo-700 font-bold shadow-sm' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'}
-                                                        `}
-                                                    >
-                                                        <div className="flex items-center gap-2 overflow-hidden">
-                                                            <i className={`ph ph-file-text text-base shrink-0 ${activeSystemId === system.id && !isMobile ? 'text-indigo-500' : 'text-gray-400'}`}></i>
-                                                            <span className="truncate">{system.title}</span>
-                                                        </div>
-                                                        <button 
-                                                            onClick={(e) => requestDeleteSystem(system.id, system.title, e)}
-                                                            className={`p-1.5 rounded text-gray-300 hover:bg-red-100 hover:text-red-600 transition-colors
-                                                                ${isMobile ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}
-                                                            `}
-                                                        >
-                                                            <i className="ph ph-trash text-sm"></i>
-                                                        </button>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        )}
-                                    </div>
-                                ))}
+                            <div className="space-y-2">
+                                {/* ルートレベルのフォルダから再帰的に描画 */}
+                                {renderFolderTree(null)}
                                 
+                                {/* フォルダなしシステム（もしあれば） */}
                                 {systems.filter(s => s.folderId === null).length > 0 && (
-                                    <div className="mt-4 border-t border-gray-100 pt-3 space-y-0.5">
+                                    <div className="mt-4 border-t border-gray-100 pt-3 space-y-1">
                                         {systems.filter(s => s.folderId === null).map(system => (
                                             <div
                                                 key={system.id}
                                                 onClick={() => handleSelectSystem(system.id)}
-                                                className={`group flex items-center justify-between px-3 py-2.5 rounded-md cursor-pointer text-sm transition-all
-                                                    ${activeSystemId === system.id && !isMobile ? 'bg-indigo-50 text-indigo-700 font-bold shadow-sm' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'}
+                                                className={`group/sys relative flex items-center justify-between px-3 py-2.5 rounded-xl cursor-pointer text-sm transition-all
+                                                    ${activeSystemId === system.id && !isMobile ? 'bg-indigo-50 text-indigo-700 font-bold shadow-sm ring-1 ring-indigo-100' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900 font-medium'}
                                                 `}
                                             >
                                                 <div className="flex items-center gap-2 overflow-hidden">
@@ -390,13 +532,23 @@
                                                     <span className="truncate">{system.title}</span>
                                                 </div>
                                                 <button 
-                                                    onClick={(e) => requestDeleteSystem(system.id, system.title, e)}
-                                                    className={`p-1.5 rounded text-gray-300 hover:bg-red-100 hover:text-red-600 transition-colors
-                                                        ${isMobile ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}
-                                                    `}
+                                                    onClick={(e) => toggleDropdown(e, `sys-${system.id}`)}
+                                                    className={`p-1.5 rounded-lg transition-colors opacity-100 md:opacity-0 md:group-hover/sys:opacity-100 ${activeDropdown === `sys-${system.id}` ? 'bg-white text-indigo-600 shadow-sm opacity-100' : 'text-gray-400 hover:text-gray-700 hover:bg-white hover:shadow-sm'}`}
                                                 >
-                                                    <i className="ph ph-trash text-sm"></i>
+                                                    <i className="ph ph-dots-three-vertical text-sm font-bold"></i>
                                                 </button>
+
+                                                {activeDropdown === `sys-${system.id}` && (
+                                                    <div className="absolute right-0 top-full mt-1 w-40 bg-white border border-gray-100 rounded-xl shadow-lg z-50 py-1.5 animate-in fade-in zoom-in" onClick={e => e.stopPropagation()}>
+                                                        <button onClick={() => { openRenameSystem(system); setActiveDropdown(null); }} className="w-full flex items-center gap-2 text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 font-medium">
+                                                            <i className="ph ph-pencil-simple"></i> 名前を変更
+                                                        </button>
+                                                        <div className="h-px bg-gray-100 my-1"></div>
+                                                        <button onClick={() => { requestDeleteSystem(system); setActiveDropdown(null); }} className="w-full flex items-center gap-2 text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 font-medium">
+                                                            <i className="ph ph-trash"></i> 削除
+                                                        </button>
+                                                    </div>
+                                                )}
                                             </div>
                                         ))}
                                     </div>
@@ -444,7 +596,7 @@
                                             onClick={() => openEditor('new')}
                                             className="flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl shadow-md shadow-indigo-200 transition-all font-bold text-sm w-full sm:w-auto shrink-0 active:scale-95"
                                         >
-                                            <i className="ph ph-plus text-base font-bold"></i> 新規サイクルを回す
+                                            <i className="ph ph-plus text-base font-bold"></i> 新規サイクル
                                         </button>
                                     )}
                                 </div>
