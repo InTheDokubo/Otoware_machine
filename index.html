@@ -1,149 +1,655 @@
+```html
 <!DOCTYPE html>
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ULTRA EAR RAPE MACHINE</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>PDCyclAr - モダンPDCAツール</title>
+    
+    <!-- Tailwind CSS (Play CDN for standalone) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'ui-sans-serif', 'system-ui', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'Helvetica Neue', 'Arial', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- React & ReactDOM -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+    
+    <!-- Babel for JSX -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
     <style>
-        body { font-family: 'Arial Black', sans-serif; background: #000; color: #f00; text-align: center; padding: 20px; }
-        .main-card { border: 5px solid #f00; background: #111; padding: 20px; max-width: 800px; margin: auto; box-shadow: 0 0 20px #f00; }
-        video { width: 100%; border: 2px solid #fff; margin: 15px 0; background: #222; }
-        .controls { display: grid; gap: 15px; margin: 20px 0; background: #222; padding: 15px; border-radius: 8px; }
-        input[type="range"] { width: 100%; cursor: pointer; accent-color: #f00; }
-        .btn-group { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
-        button { padding: 15px 30px; font-size: 1.1rem; font-weight: bold; cursor: pointer; border: none; border-radius: 5px; transition: 0.2s; }
-        #playBtn { background: #00ff00; color: #000; }
-        #recordBtn { background: #ff0000; color: #fff; }
-        button:disabled { background: #444; color: #888; cursor: not-allowed; }
-        .warning { color: yellow; font-size: 0.8rem; margin-bottom: 10px; }
+        /* カスタムスクロールバー & 全体設定 */
+        body { margin: 0; padding: 0; overflow: hidden; background-color: #f9fafb; }
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        
+        /* ページ遷移などのアニメーションユーティリティ */
+        .animate-in { animation-duration: 0.3s; animation-fill-mode: forwards; }
+        .fade-in { animation-name: fadeIn; }
+        .slide-in-bottom { animation-name: slideInBottom; }
+        
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes slideInBottom { from { transform: translateY(10px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
     </style>
 </head>
 <body>
+    <div id="root"></div>
 
-<div class="main-card">
-    <h1>⚠️ 音量注意：超音割れ ⚠️</h1>
-    <p class="warning">※スピーカーの破損にご注意ください。爆音が出ます。</p>
+    <script type="text/babel">
+        const { useState, useMemo, useEffect, useRef } = React;
 
-    <input type="file" id="fileInput" accept="video/*">
+        // --- PDCyclAr カスタムロゴコンポーネント ---
+        const Logo = ({ size = 24, color = "currentColor", className = "" }) => (
+            <svg width={size} height={size} viewBox="0 0 100 100" style={{ color }} className={className} xmlns="http://www.w3.org/2000/svg">
+                <g>
+                    <path d="M 83.053 62.58 A 35 35 0 0 1 50 85 M 50 85 L 50 85 L 52.544 94.619" fill="none" stroke="currentColor" strokeWidth="6" strokeLinecap="round" strokeLinejoin="round" />
+                    <path d="M 16.946 37.41 A 35 35 0 0 1 50 15 M 50 15 L 50 15 L 47.455 5.38" fill="none" stroke="currentColor" strokeWidth="6" strokeLinecap="round" strokeLinejoin="round" />
+                    <path d="M 62.58 16.94 A 35 35 0 0 1 85 50 M 85 50 L 85 50 L 94.619 47.45" fill="none" stroke="currentColor" strokeWidth="6" strokeLinecap="round" strokeLinejoin="round" />
+                    <path d="M 37.41 83.05 A 35 35 0 0 1 15 50 M 15 50 L 15 50 L 5.38 52.54" fill="none" stroke="currentColor" strokeWidth="6" strokeLinecap="round" strokeLinejoin="round" />
+                    <path d="M 50,37 L 61.258,43.5 L 61.258,56.5 L 50,63 L 38.741,56.5 L 38.741,43.5 Z M 50,50 L 50,63 M 50,50 L 38.741,43.5 M 50,50 L 61.258,43.5" fill="none" stroke="currentColor" strokeWidth="6" strokeLinecap="round" strokeLinejoin="round" />
+                </g>
+            </svg>
+        );
 
-    <div class="controls">
-        <label>音の歪み (Distortion): <span id="distLabel">100</span></label>
-        <input type="range" id="distRange" min="1" max="200" value="100">
-        
-        <label>爆音ブースト (Gain): <span id="gainLabel">30</span></label>
-        <input type="range" id="gainRange" min="1" max="100" value="30">
-    </div>
-
-    <div class="btn-group">
-        <button id="playBtn">🔊 プレビュー再生</button>
-        <button id="recordBtn" disabled>💾 加工して保存用生成</button>
-    </div>
-
-    <p id="status"></p>
-    <video id="videoPlayer" crossorigin="anonymous"></video>
-</div>
-
-<script>
-    const fileInput = document.getElementById('fileInput');
-    const video = document.getElementById('videoPlayer');
-    const playBtn = document.getElementById('playBtn');
-    const recordBtn = document.getElementById('recordBtn');
-    const distRange = document.getElementById('distRange');
-    const gainRange = document.getElementById('gainRange');
-    const status = document.getElementById('status');
-
-    let audioCtx, source, distortion, gainNode, dest;
-
-    // 数値表示の更新
-    distRange.oninput = () => document.getElementById('distLabel').innerText = distRange.value;
-    gainRange.oninput = () => document.getElementById('gainLabel').innerText = gainRange.value;
-
-    function initAudio() {
-        if (audioCtx) return;
-        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        source = audioCtx.createMediaElementSource(video);
-        distortion = audioCtx.createWaveShaper();
-        gainNode = audioCtx.createGain();
-        dest = audioCtx.createMediaStreamDestination();
-
-        // 激しく歪ませるカーブ作成
-        distortion.curve = makeDistortionCurve(distRange.value * 10);
-        distortion.oversample = '4x';
-        gainNode.gain.value = gainRange.value;
-
-        // プレビュー用にスピーカー(destination)と、録音用に(dest)の両方に繋ぐ
-        source.connect(distortion);
-        distortion.connect(gainNode);
-        gainNode.connect(audioCtx.destination);
-        gainNode.connect(dest);
-    }
-
-    function makeDistortionCurve(amount) {
-        let n_samples = 44100, curve = new Float32Array(n_samples);
-        for (let i = 0 ; i < n_samples; ++i ) {
-            let x = i * 2 / n_samples - 1;
-            curve[i] = (3 + amount) * x * Math.PI / (Math.PI + amount * Math.abs(x));
-        }
-        return curve;
-    }
-
-    fileInput.onchange = () => {
-        const file = fileInput.files[0];
-        if (file) {
-            video.src = URL.createObjectURL(file);
-            recordBtn.disabled = false;
-            status.innerText = "動画を読み込みました。";
-        }
-    };
-
-    // プレビュー再生
-    playBtn.onclick = async () => {
-        initAudio();
-        // スライダーの値を反映
-        distortion.curve = makeDistortionCurve(distRange.value * 10);
-        gainNode.gain.value = gainRange.value;
-        
-        if (audioCtx.state === 'suspended') await audioCtx.resume();
-        video.play();
-        status.innerText = "爆音プレビュー中...";
-    };
-
-    // 録画と保存（どのブラウザでもダウンロードを強制する）
-    recordBtn.onclick = () => {
-        initAudio();
-        video.currentTime = 0;
-        video.play();
-        status.innerText = "録画中... 最後まで再生されるのを待ってください。";
-
-        const stream = video.captureStream();
-        const combined = new MediaStream([
-            ...stream.getVideoTracks(),
-            ...dest.stream.getAudioTracks()
-        ]);
-
-        const recorder = new MediaRecorder(combined, { mimeType: 'video/webm' });
-        const chunks = [];
-
-        recorder.ondataavailable = e => chunks.push(e.data);
-        recorder.onstop = () => {
-            const blob = new Blob(chunks, { type: 'video/webm' });
-            const url = URL.createObjectURL(blob);
-            
-            // 強制ダウンロード処理
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = "ear_rape_result.webm";
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            
-            status.innerText = "保存が完了しました！";
+        // --- アイコンラッパー ---
+        const Icon = ({ name, className = "" }) => {
+            const iconRef = useRef(null);
+            useEffect(() => {
+                if (iconRef.current && window.lucide) {
+                    window.lucide.createIcons({
+                        root: iconRef.current.parentElement,
+                        nameAttr: 'data-lucide'
+                    });
+                }
+            }, [name]);
+            return <i ref={iconRef} data-lucide={name} className={className}></i>;
         };
 
-        recorder.start();
-        video.onended = () => recorder.stop();
-    };
-</script>
+        // --- 初期モックデータ（初回のみ使用） ---
+        const initialFolders = [
+            { id: 'f1', name: '💻 プロジェクト' },
+            { id: 'f2', name: '🌱 自己研鑽' }
+        ];
 
+        const initialSystems = [
+            { id: 's1', folderId: 'f1', title: 'PDCyclAr ツール開発' },
+            { id: 's3', folderId: 'f2', title: '英語学習（TOEIC）' }
+        ];
+
+        const initialCycles = [
+            {
+                id: 'c1', systemId: 's1', date: new Date().toISOString(),
+                plan: 'ツールの要件定義とUIの作成',
+                do: '要件を整理し、単一HTMLで動くように実装した。',
+                check: 'localStorageによる保存機能を追加したことで、個人利用には十分な形になった。',
+                action: 'しばらく自分で使いながら、バグや使いにくい部分を洗い出す。'
+            }
+        ];
+
+        // --- LocalStorage ヘルパー ---
+        const STORAGE_KEY = 'pdcyclar_data_v1';
+        
+        const loadData = () => {
+            try {
+                const data = localStorage.getItem(STORAGE_KEY);
+                if (data) {
+                    return JSON.parse(data);
+                }
+            } catch (e) {
+                console.error("Failed to load data from localStorage", e);
+            }
+            return { folders: initialFolders, systems: initialSystems, cycles: initialCycles };
+        };
+
+        const saveData = (folders, systems, cycles) => {
+            try {
+                localStorage.setItem(STORAGE_KEY, JSON.stringify({ folders, systems, cycles }));
+            } catch (e) {
+                console.error("Failed to save data to localStorage", e);
+            }
+        };
+
+        // --- メインアプリケーション ---
+        const App = () => {
+            // Stateの初期化時にlocalStorageから読み込む
+            const [data, setData] = useState(loadData);
+            
+            const folders = data.folders;
+            const systems = data.systems;
+            const cycles = data.cycles;
+
+            // データが更新されるたびにlocalStorageに保存
+            useEffect(() => {
+                saveData(folders, systems, cycles);
+            }, [folders, systems, cycles]);
+
+            const [activeSystemId, setActiveSystemId] = useState(systems.length > 0 ? systems[0].id : null);
+            const [editingCycleId, setEditingCycleId] = useState(null);
+            
+            // 全てのフォルダをデフォルトで開く
+            const [expandedFolders, setExpandedFolders] = useState(() => {
+                const initialExp = {};
+                folders.forEach(f => initialExp[f.id] = true);
+                return initialExp;
+            });
+
+            const [formData, setFormData] = useState({ plan: '', do: '', check: '', action: '', date: '' });
+
+            // レスポンシブ用
+            const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+            const [mobileView, setMobileView] = useState('sidebar'); // 'sidebar' | 'main'
+            
+            // PC用リサイザー
+            const [sidebarWidth, setSidebarWidth] = useState(300);
+            const [isDragging, setIsDragging] = useState(false);
+
+            // モーダル
+            const [confirmModal, setConfirmModal] = useState({ isOpen: false, title: '', message: '', onConfirm: null });
+
+            // ウィンドウサイズ監視
+            useEffect(() => {
+                const handleResize = () => setIsMobile(window.innerWidth < 768);
+                window.addEventListener('resize', handleResize);
+                return () => window.removeEventListener('resize', handleResize);
+            }, []);
+
+            // リサイズドラッグ処理
+            useEffect(() => {
+                const handleMouseMove = (e) => {
+                    if (!isDragging) return;
+                    setSidebarWidth(Math.max(200, Math.min(e.clientX, 600)));
+                };
+                const handleMouseUp = () => setIsDragging(false);
+
+                if (isDragging) {
+                    document.addEventListener('mousemove', handleMouseMove);
+                    document.addEventListener('mouseup', handleMouseUp);
+                }
+                return () => {
+                    document.removeEventListener('mousemove', handleMouseMove);
+                    document.removeEventListener('mouseup', handleMouseUp);
+                };
+            }, [isDragging]);
+
+            // アイコンの再レンダリング処理（動的生成要素向け）
+            useEffect(() => {
+                if (window.lucide) {
+                    window.lucide.createIcons();
+                }
+            });
+
+            // 算出プロパティ
+            const activeSystem = useMemo(() => systems.find(s => s.id === activeSystemId), [systems, activeSystemId]);
+            const activeCycles = useMemo(() => {
+                return cycles
+                    .filter(c => c.systemId === activeSystemId)
+                    .sort((a, b) => new Date(b.date) - new Date(a.date));
+            }, [cycles, activeSystemId]);
+
+            // --- アクションハンドラ ---
+            const updateState = (newFolders, newSystems, newCycles) => {
+                setData({ folders: newFolders, systems: newSystems, cycles: newCycles });
+            };
+
+            const toggleFolder = (folderId) => {
+                setExpandedFolders(prev => ({ ...prev, [folderId]: !prev[folderId] }));
+            };
+
+            const handleSelectSystem = (systemId) => {
+                setActiveSystemId(systemId);
+                setEditingCycleId(null);
+                if (isMobile) setMobileView('main');
+            };
+
+            const handleCreateSystem = (folderId) => {
+                const title = prompt('新しいサイクル系統のタイトルを入力してください:');
+                if (title) {
+                    const newSystem = { id: `s${Date.now()}`, folderId, title };
+                    updateState(folders, [...systems, newSystem], cycles);
+                    handleSelectSystem(newSystem.id);
+                }
+            };
+
+            const handleCreateFolder = () => {
+                const name = prompt('新しいフォルダ名を入力してください:');
+                if (name) {
+                    const newFolder = { id: `f${Date.now()}`, name };
+                    updateState([...folders, newFolder], systems, cycles);
+                    setExpandedFolders(prev => ({ ...prev, [newFolder.id]: true }));
+                }
+            };
+
+            const requestDeleteSystem = (systemId, systemTitle, e) => {
+                e.stopPropagation();
+                setConfirmModal({
+                    isOpen: true,
+                    title: 'サイクル系統の削除',
+                    message: `「${systemTitle}」と、その中に含まれるすべてのサイクルを削除しますか？`,
+                    onConfirm: () => {
+                        const newSystems = systems.filter(s => s.id !== systemId);
+                        const newCycles = cycles.filter(c => c.systemId !== systemId);
+                        updateState(folders, newSystems, newCycles);
+                        if (activeSystemId === systemId) setActiveSystemId(null);
+                        setConfirmModal({ isOpen: false, title: '', message: '', onConfirm: null });
+                    }
+                });
+            };
+
+            const requestDeleteCycle = (cycleId) => {
+                setConfirmModal({
+                    isOpen: true,
+                    title: 'サイクルの削除',
+                    message: 'このサイクルを削除してもよろしいですか？',
+                    onConfirm: () => {
+                        updateState(folders, systems, cycles.filter(c => c.id !== cycleId));
+                        setConfirmModal({ isOpen: false, title: '', message: '', onConfirm: null });
+                    }
+                });
+            };
+
+            const getPreviousAction = () => {
+                const sortedCycles = cycles
+                    .filter(c => c.systemId === activeSystemId)
+                    .sort((a, b) => new Date(a.date) - new Date(b.date)); 
+                
+                if (sortedCycles.length === 0) return null;
+                if (editingCycleId === 'new') return sortedCycles[sortedCycles.length - 1].action;
+                
+                const currentIndex = sortedCycles.findIndex(c => c.id === editingCycleId);
+                if (currentIndex > 0) return sortedCycles[currentIndex - 1].action;
+                
+                return null;
+            };
+
+            const openEditor = (cycleId = 'new') => {
+                if (cycleId === 'new') {
+                    // 日本時間などのタイムゾーンを考慮したISO文字列生成
+                    const now = new Date();
+                    const tzOffset = now.getTimezoneOffset() * 60000;
+                    const localISOTime = (new Date(now - tzOffset)).toISOString().slice(0, 16);
+                    setFormData({ plan: '', do: '', check: '', action: '', date: localISOTime });
+                } else {
+                    const target = cycles.find(c => c.id === cycleId);
+                    if (target) {
+                        const dt = new Date(target.date);
+                        const tzOffset = dt.getTimezoneOffset() * 60000;
+                        const localISOTime = (new Date(dt - tzOffset)).toISOString().slice(0, 16);
+                        setFormData({
+                            plan: target.plan || '', do: target.do || '', check: target.check || '', action: target.action || '',
+                            date: localISOTime
+                        });
+                    }
+                }
+                setEditingCycleId(cycleId);
+            };
+
+            const handleSaveCycle = () => {
+                const isoDate = new Date(formData.date).toISOString();
+                if (editingCycleId === 'new') {
+                    const newCycle = { id: `c${Date.now()}`, systemId: activeSystemId, ...formData, date: isoDate };
+                    updateState(folders, systems, [...cycles, newCycle]);
+                } else {
+                    const newCycles = cycles.map(c => c.id === editingCycleId ? { ...c, ...formData, date: isoDate } : c);
+                    updateState(folders, systems, newCycles);
+                }
+                setEditingCycleId(null);
+            };
+
+            const handleChange = (e) => {
+                const { name, value } = e.target;
+                setFormData(prev => ({ ...prev, [name]: value }));
+            };
+
+            const previousAction = getPreviousAction();
+
+            // --- レンダリング ---
+            return (
+                <div className={`flex h-screen bg-gray-50 text-gray-800 font-sans overflow-hidden ${isDragging ? 'select-none cursor-col-resize' : ''}`}>
+                    
+                    {/* モーダル */}
+                    {confirmModal.isOpen && (
+                        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-in fade-in">
+                            <div className="bg-white rounded-xl shadow-xl max-w-sm w-full overflow-hidden">
+                                <div className="p-5 flex gap-4">
+                                    <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center shrink-0">
+                                        <Icon name="alert-triangle" className="w-5 h-5 text-red-600" />
+                                    </div>
+                                    <div>
+                                        <h3 className="text-lg font-bold text-gray-900">{confirmModal.title}</h3>
+                                        <p className="mt-2 text-sm text-gray-600 leading-relaxed">{confirmModal.message}</p>
+                                    </div>
+                                </div>
+                                <div className="px-5 py-4 bg-gray-50 flex justify-end gap-3 border-t border-gray-100">
+                                    <button onClick={() => setConfirmModal({ ...confirmModal, isOpen: false })} className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
+                                        キャンセル
+                                    </button>
+                                    <button onClick={confirmModal.onConfirm} className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 transition-colors shadow-sm">
+                                        削除する
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* --- 左ペイン（サイドバー） --- */}
+                    <div 
+                        className={`
+                            ${isMobile && mobileView === 'main' ? 'hidden' : 'flex'} 
+                            ${isMobile ? 'w-full' : 'md:flex'} 
+                            flex-col h-full bg-white flex-shrink-0 relative z-10 border-r border-gray-200
+                        `}
+                        style={{ width: isMobile ? '100%' : sidebarWidth }}
+                    >
+                        <div className="p-4 md:p-5 border-b border-gray-100 flex items-center justify-between shrink-0 bg-white">
+                            <div className="flex items-center gap-2 text-indigo-600 font-bold text-xl tracking-tight">
+                                <Logo size={28} className="text-indigo-600" />
+                                <span>PDCyclAr</span>
+                            </div>
+                        </div>
+
+                        <div className="flex-1 overflow-y-auto p-3 md:p-4 pb-20">
+                            <div className="flex items-center justify-between mb-3 group px-1">
+                                <span className="text-xs font-bold text-gray-400 tracking-wider uppercase">全てのサイクル</span>
+                                <button onClick={handleCreateFolder} className="text-gray-400 hover:text-indigo-600 md:opacity-0 md:group-hover:opacity-100 transition-opacity p-1 bg-gray-50 rounded-md">
+                                    <Icon name="folder-plus" className="w-4 h-4" />
+                                </button>
+                            </div>
+
+                            <div className="space-y-1">
+                                {folders.map(folder => (
+                                    <div key={folder.id} className="mb-3">
+                                        <div 
+                                            className="flex items-center justify-between px-2 py-2 rounded-lg hover:bg-gray-100 cursor-pointer text-sm font-semibold text-gray-700 transition-colors"
+                                            onClick={() => toggleFolder(folder.id)}
+                                        >
+                                            <div className="flex items-center gap-2">
+                                                <Icon name={expandedFolders[folder.id] ? "chevron-down" : "chevron-right"} className="w-4 h-4 text-gray-400" />
+                                                <Icon name="folder" className="w-4 h-4 text-indigo-400" />
+                                                <span className="truncate">{folder.name}</span>
+                                            </div>
+                                            <button 
+                                                onClick={(e) => { e.stopPropagation(); handleCreateSystem(folder.id); }}
+                                                className="text-gray-400 hover:text-indigo-600 p-1 shrink-0"
+                                                title="このフォルダに新規系統を作成"
+                                            >
+                                                <Icon name="plus" className="w-4 h-4" />
+                                            </button>
+                                        </div>
+
+                                        {expandedFolders[folder.id] && (
+                                            <div className="ml-6 mt-1 space-y-0.5 border-l-2 border-gray-100 pl-2">
+                                                {systems.filter(s => s.folderId === folder.id).map(system => (
+                                                    <div
+                                                        key={system.id}
+                                                        onClick={() => handleSelectSystem(system.id)}
+                                                        className={`group flex items-center justify-between px-3 py-2.5 rounded-md cursor-pointer text-sm transition-all
+                                                            ${activeSystemId === system.id && !isMobile ? 'bg-indigo-50 text-indigo-700 font-bold shadow-sm' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'}
+                                                        `}
+                                                    >
+                                                        <div className="flex items-center gap-2 overflow-hidden">
+                                                            <Icon name="file-text" className={`w-4 h-4 shrink-0 ${activeSystemId === system.id && !isMobile ? 'text-indigo-500' : 'text-gray-400'}`} />
+                                                            <span className="truncate">{system.title}</span>
+                                                        </div>
+                                                        <button 
+                                                            onClick={(e) => requestDeleteSystem(system.id, system.title, e)}
+                                                            className={`p-1.5 rounded text-gray-300 hover:bg-red-100 hover:text-red-600 transition-colors
+                                                                ${isMobile ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}
+                                                            `}
+                                                        >
+                                                            <Icon name="trash-2" className="w-3.5 h-3.5" />
+                                                        </button>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                ))}
+                                
+                                {/* フォルダなし */}
+                                {systems.filter(s => s.folderId === null).length > 0 && (
+                                    <div className="mt-4 border-t border-gray-100 pt-3 space-y-0.5">
+                                        {systems.filter(s => s.folderId === null).map(system => (
+                                            <div
+                                                key={system.id}
+                                                onClick={() => handleSelectSystem(system.id)}
+                                                className={`group flex items-center justify-between px-3 py-2.5 rounded-md cursor-pointer text-sm transition-all
+                                                    ${activeSystemId === system.id && !isMobile ? 'bg-indigo-50 text-indigo-700 font-bold shadow-sm' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'}
+                                                `}
+                                            >
+                                                <div className="flex items-center gap-2 overflow-hidden">
+                                                    <Icon name="file-text" className={`w-4 h-4 shrink-0 ${activeSystemId === system.id && !isMobile ? 'text-indigo-500' : 'text-gray-400'}`} />
+                                                    <span className="truncate">{system.title}</span>
+                                                </div>
+                                                <button 
+                                                    onClick={(e) => requestDeleteSystem(system.id, system.title, e)}
+                                                    className={`p-1.5 rounded text-gray-300 hover:bg-red-100 hover:text-red-600 transition-colors
+                                                        ${isMobile ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}
+                                                    `}
+                                                >
+                                                    <Icon name="trash-2" className="w-3.5 h-3.5" />
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* --- リサイザー (PCのみ) --- */}
+                    {!isMobile && (
+                        <div
+                            className={`w-1 cursor-col-resize hover:bg-indigo-400 z-10 transition-colors ${isDragging ? 'bg-indigo-500' : 'bg-transparent'}`}
+                            onMouseDown={() => setIsDragging(true)}
+                        />
+                    )}
+
+                    {/* --- 右ペイン（メインコンテンツ） --- */}
+                    <div 
+                        className={`
+                            flex-1 flex-col h-full bg-gray-50/50
+                            ${isMobile && mobileView === 'sidebar' ? 'hidden' : 'flex'}
+                            ${isMobile ? 'w-full' : 'md:flex'}
+                        `}
+                    >
+                        {activeSystem ? (
+                            <>
+                                {/* ヘッダー */}
+                                <div className="bg-white/80 backdrop-blur-md px-4 md:px-8 py-4 md:py-6 border-b border-gray-200 flex flex-col sm:flex-row sm:items-center justify-between shrink-0 gap-4 z-10">
+                                    <div className="flex items-center gap-3 overflow-hidden">
+                                        {isMobile && (
+                                            <button onClick={() => setMobileView('sidebar')} className="p-2 -ml-2 text-gray-500 hover:bg-gray-100 rounded-full transition-colors shrink-0">
+                                                <Icon name="chevron-left" className="w-6 h-6" />
+                                            </button>
+                                        )}
+                                        <div className="overflow-hidden">
+                                            <h1 className="text-xl md:text-2xl font-black text-gray-800 truncate tracking-tight">{activeSystem.title}</h1>
+                                            <p className="text-xs md:text-sm text-gray-500 mt-0.5 flex items-center gap-1.5">
+                                                <Icon name="target" className="w-3.5 h-3.5" /> サイクル系統
+                                            </p>
+                                        </div>
+                                    </div>
+                                    
+                                    {!editingCycleId && (
+                                        <button
+                                            onClick={() => openEditor('new')}
+                                            className="flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl shadow-md shadow-indigo-200 transition-all font-bold text-sm w-full sm:w-auto shrink-0 active:scale-95"
+                                        >
+                                            <Icon name="plus" className="w-4 h-4" /> 新規サイクルを回す
+                                        </button>
+                                    )}
+                                </div>
+
+                                {/* コンテンツエリア */}
+                                <div className="flex-1 overflow-y-auto p-4 md:p-8 relative">
+                                    
+                                    {editingCycleId ? (
+                                        // --- エディタ ---
+                                        <div className="max-w-4xl mx-auto bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden animate-in slide-in-bottom">
+                                            <div className="px-4 md:px-6 py-4 bg-gray-50/80 border-b border-gray-200 flex justify-between items-center">
+                                                <h2 className="text-base md:text-lg font-bold text-gray-800 flex items-center gap-2">
+                                                    {editingCycleId === 'new' ? <><Icon name="plus-circle" className="w-5 h-5 text-indigo-500"/> 新しいサイクル</> : <><Icon name="edit-3" className="w-5 h-5 text-indigo-500"/> サイクルを編集</>}
+                                                </h2>
+                                                <button onClick={() => setEditingCycleId(null)} className="text-gray-400 hover:text-gray-600 p-1.5 bg-white rounded-full border border-gray-200 shadow-sm transition-colors">
+                                                    <Icon name="x" className="w-5 h-5" />
+                                                </button>
+                                            </div>
+                                            
+                                            <div className="p-4 md:p-6 space-y-6">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="p-2 bg-gray-100 rounded-lg"><Icon name="calendar" className="w-5 h-5 text-gray-500" /></div>
+                                                    <input 
+                                                        type="datetime-local" 
+                                                        name="date"
+                                                        value={formData.date}
+                                                        onChange={handleChange}
+                                                        className="px-3 py-2 border border-gray-300 rounded-lg text-sm font-medium focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none w-full sm:w-auto bg-gray-50 focus:bg-white transition-colors"
+                                                    />
+                                                </div>
+
+                                                {previousAction && (
+                                                    <div className="bg-green-50 border border-green-100 border-l-4 border-l-green-500 p-4 rounded-r-xl rounded-l-sm flex gap-3 items-start">
+                                                        <Icon name="arrow-right-circle" className="w-5 h-5 text-green-600 shrink-0 mt-0.5" />
+                                                        <div>
+                                                            <p className="text-xs font-bold text-green-800 uppercase tracking-wider mb-1">前回の改善点 (Action)</p>
+                                                            <p className="text-sm text-green-900 leading-relaxed font-medium">{previousAction}</p>
+                                                        </div>
+                                                    </div>
+                                                )}
+
+                                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                                    {[
+                                                        { id: 'plan', label: 'Plan (計画)', char: 'P', color: 'blue' },
+                                                        { id: 'do', label: 'Do (実行)', char: 'D', color: 'amber' },
+                                                        { id: 'check', label: 'Check (評価)', char: 'C', color: 'purple' },
+                                                        { id: 'action', label: 'Action (改善)', char: 'A', color: 'emerald' }
+                                                    ].map(field => (
+                                                        <div key={field.id} className="space-y-2 relative group">
+                                                            <label className={`flex items-center gap-2 font-bold text-${field.color}-700`}>
+                                                                <span className={`bg-${field.color}-100 text-${field.color}-800 w-7 h-7 rounded-full flex items-center justify-center text-sm shadow-sm`}>{field.char}</span>
+                                                                {field.label}
+                                                            </label>
+                                                            <textarea
+                                                                name={field.id} value={formData[field.id]} onChange={handleChange}
+                                                                placeholder={`${field.label}を記入...`}
+                                                                className={`w-full h-32 md:h-40 p-4 border border-gray-200 rounded-xl bg-${field.color}-50/30 focus:bg-white focus:ring-2 focus:ring-${field.color}-500 outline-none resize-none transition-all text-sm md:text-base leading-relaxed`}
+                                                            />
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                            
+                                            <div className="px-4 md:px-6 py-4 bg-gray-50/80 border-t border-gray-200 flex flex-col-reverse sm:flex-row justify-end gap-3">
+                                                <button onClick={() => setEditingCycleId(null)} className="px-5 py-2.5 text-sm font-bold text-gray-600 bg-white border border-gray-300 hover:bg-gray-50 rounded-xl transition-colors w-full sm:w-auto text-center shadow-sm">
+                                                    キャンセル
+                                                </button>
+                                                <button onClick={handleSaveCycle} className="flex items-center justify-center gap-2 px-8 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold rounded-xl shadow-md shadow-indigo-200 transition-all w-full sm:w-auto active:scale-95">
+                                                    <Icon name="save" className="w-4 h-4" /> 保存する
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                    ) : (
+                                        // --- 一覧 ---
+                                        <div className="max-w-4xl mx-auto pb-10">
+                                            {activeCycles.length === 0 ? (
+                                                <div className="text-center py-20 bg-white rounded-3xl border border-dashed border-gray-300 px-4 shadow-sm">
+                                                    <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                                                        <Icon name="activity" className="w-8 h-8 text-gray-400" />
+                                                    </div>
+                                                    <h3 className="text-xl font-bold text-gray-900 mb-2">まだサイクルがありません</h3>
+                                                    <p className="text-gray-500 text-sm mb-8 font-medium">最初のPDCAサイクルを回して、改善を始めましょう。</p>
+                                                    <button onClick={() => openEditor('new')} className="inline-flex items-center gap-2 bg-indigo-600 text-white px-6 py-3 rounded-xl shadow-md hover:bg-indigo-700 transition-all font-bold active:scale-95">
+                                                        <Icon name="plus" className="w-5 h-5" /> 最初のサイクルを作成
+                                                    </button>
+                                                </div>
+                                            ) : (
+                                                <div className="space-y-6 md:space-y-8">
+                                                    {activeCycles.map((cycle, index) => (
+                                                        <div key={cycle.id} className="relative pl-6 md:pl-10 animate-in fade-in">
+                                                            {/* タイムライン */}
+                                                            <div className="absolute left-[11px] md:left-[15px] top-8 bottom-[-32px] w-0.5 bg-indigo-100 last:hidden rounded-full"></div>
+                                                            <div className="absolute left-0 md:left-1 top-6 w-6 h-6 md:w-8 md:h-8 rounded-full bg-indigo-50 border-[3px] border-white flex items-center justify-center shadow-sm">
+                                                                <div className="w-2 h-2 md:w-3 md:h-3 rounded-full bg-indigo-500"></div>
+                                                            </div>
+
+                                                            {/* カード */}
+                                                            <div className="bg-white border border-gray-100 rounded-2xl md:rounded-3xl p-5 md:p-8 shadow-[0_4px_20px_rgb(0,0,0,0.03)] hover:shadow-[0_4px_25px_rgb(0,0,0,0.06)] transition-all group">
+                                                                <div className="flex justify-between items-start mb-6">
+                                                                    <div className="flex flex-wrap items-center gap-3">
+                                                                        <div className="flex items-center gap-1.5 text-gray-500 text-xs md:text-sm font-medium bg-gray-50 px-3 py-1.5 rounded-lg border border-gray-100">
+                                                                            <Icon name="calendar" className="w-4 h-4" />
+                                                                            {new Date(cycle.date).toLocaleString('ja-JP', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                                                                        </div>
+                                                                        {index === 0 && <span className="px-2.5 py-1 bg-indigo-100 text-indigo-700 rounded-lg text-xs font-black tracking-wide">LATEST</span>}
+                                                                    </div>
+                                                                    <div className="flex items-center gap-2 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+                                                                        <button onClick={() => requestDeleteCycle(cycle.id)} className="text-gray-400 hover:text-red-500 hover:bg-red-50 p-2 rounded-xl transition-colors" title="削除">
+                                                                            <Icon name="trash-2" className="w-4 h-4" />
+                                                                        </button>
+                                                                        <button onClick={() => openEditor(cycle.id)} className="text-white bg-indigo-500 hover:bg-indigo-600 p-2 rounded-xl shadow-sm transition-colors" title="編集">
+                                                                            <Icon name="edit-3" className="w-4 h-4" />
+                                                                        </button>
+                                                                    </div>
+                                                                </div>
+
+                                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
+                                                                    {[
+                                                                        { label: 'Plan', char: 'P', color: 'blue', text: cycle.plan },
+                                                                        { label: 'Do', char: 'D', color: 'amber', text: cycle.do },
+                                                                        { label: 'Check', char: 'C', color: 'purple', text: cycle.check },
+                                                                        { label: 'Action', char: 'A', color: 'emerald', text: cycle.action }
+                                                                    ].map(item => (
+                                                                        <div key={item.label} className="space-y-2">
+                                                                            <div className={`text-xs font-bold text-${item.color}-700 flex items-center gap-2`}>
+                                                                                <span className={`bg-${item.color}-100 w-6 h-6 rounded-full flex items-center justify-center shadow-sm`}>{item.char}</span>
+                                                                                <span className="tracking-wide uppercase">{item.label}</span>
+                                                                            </div>
+                                                                            <p className="text-gray-700 text-sm whitespace-pre-wrap pl-8 leading-relaxed font-medium">
+                                                                                {item.text || <span className="text-gray-400 italic font-normal">未記入</span>}
+                                                                            </p>
+                                                                        </div>
+                                                                    ))}
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+                            </>
+                        ) : (
+                            <div className="flex-1 flex flex-col items-center justify-center text-gray-400 p-4 text-center">
+                                <Icon name="target" className="w-16 h-16 mb-6 opacity-20 text-indigo-900" />
+                                <p className="text-base md:text-lg font-bold text-gray-500">左のメニューからサイクル系統を選択するか、<br/>新しく作成してください</p>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
 </body>
 </html>
+
+```
